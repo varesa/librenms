@@ -101,16 +101,26 @@ class Isis implements Module
 
     public function discoverIsIsMib(OS $os): Collection
     {
+
+        //echo "Circuits: ";
+        //print_r(snmpwalk_cache_oid($os->getDeviceArray(), 'ISIS-MIB::isisCirc', []));
+        //echo "Adjacencies: ";
+        //print_r(snmpwalk_cache_oid($os->getDeviceArray(), 'ISIS-MIB::isisISAdj', [], null, null, '-OQUstx'));
+        //print_r(snmpwalk_cache_twopart_oid($os->getDeviceArray(), 'ISIS-MIB::isisISAdj', [], null, null, '-OQUstx'));
+        //echo "end";
+
+
         // Check if the device has any ISIS enabled interfaces
         $circuits = snmpwalk_cache_oid($os->getDeviceArray(), 'ISIS-MIB::isisCirc', []);
         $adjacencies = new Collection;
 
         if (! empty($circuits)) {
-            $adjacencies_data = snmpwalk_cache_twopart_oid($os->getDeviceArray(), 'ISIS-MIB::isisISAdj', [], null, null, '-OQUstx');
+            $adjacencies_data = snmpwalk_cache_oid($os->getDeviceArray(), 'ISIS-MIB::isisISAdj', [], null, null, '-OQUstx');
             $ifIndex_port_id_map = $os->getDevice()->ports()->pluck('port_id', 'ifIndex');
 
             // No ISIS enabled interfaces -> delete the component
             foreach ($circuits as $circuit_id => $circuit_data) {
+                $circuit_id = $circuit_id . ".1";
                 if (! isset($circuit_data['isisCircIfIndex'])) {
                     continue;
                 }
@@ -119,7 +129,7 @@ class Isis implements Module
                     continue; // Do not poll passive interfaces
                 }
 
-                $adjacency_data = Arr::last($adjacencies_data[$circuit_id] ?? [[]]);
+                $adjacency_data = $adjacencies_data[$circuit_id] ?? [[]];
 
                 $attributes = [
                     'device_id' => $os->getDeviceId(),
@@ -150,7 +160,7 @@ class Isis implements Module
 
     public function pollIsIsMib(Collection $adjacencies, OS $os): Collection
     {
-        $data = snmpwalk_cache_twopart_oid($os->getDeviceArray(), 'isisISAdjState', [], 'ISIS-MIB');
+        $data = snmpwalk_cache_twopart_oid($os->getDeviceArray(), 'isisISAdjState', [], 'ISIS-MIB')[1];
 
         if (count($data) !== $adjacencies->where('isisISAdjState', 'up')->count()) {
             echo 'New Adjacencies, running discovery';
